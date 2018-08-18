@@ -1,0 +1,4 @@
+<resources>
+    <dimen name="layout_padding">20dp</dimen>
+    <dimen name="textview_margin">10dp</dimen>
+</resources>

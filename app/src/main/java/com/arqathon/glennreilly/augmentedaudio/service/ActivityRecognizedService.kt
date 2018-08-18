@@ -27,25 +27,25 @@ class ActivityRecognizedService : IntentService {
         for (activity in probableActivities) {
             when (activity.type) {
                 DetectedActivity.IN_VEHICLE -> {
-                    Log.e("ActivityRecogition", "In Vehicle: " + activity.confidence)
+                    Log.e("ActivityRecognition", "In Vehicle: " + activity.confidence)
                 }
                 DetectedActivity.ON_BICYCLE -> {
-                    Log.e("ActivityRecogition", "On Bicycle: " + activity.confidence)
+                    Log.e("ActivityRecognition", "On Bicycle: " + activity.confidence)
                 }
                 DetectedActivity.ON_FOOT -> {
-                    Log.e("ActivityRecogition", "On Foot: " + activity.confidence)
+                    Log.e("ActivityRecognition", "On Foot: " + activity.confidence)
                 }
                 DetectedActivity.RUNNING -> {
-                    Log.e("ActivityRecogition", "Running: " + activity.confidence)
+                    Log.e("ActivityRecognition", "Running: " + activity.confidence)
                 }
                 DetectedActivity.STILL -> {
-                    Log.e("ActivityRecogition", "Still: " + activity.confidence)
+                    Log.e("ActivityRecognition", "Still: " + activity.confidence)
                 }
                 DetectedActivity.TILTING -> {
-                    Log.e("ActivityRecogition", "Tilting: " + activity.confidence)
+                    Log.e("ActivityRecognition", "Tilting: " + activity.confidence)
                 }
                 DetectedActivity.WALKING -> {
-                    Log.e("ActivityRecogition", "Walking: " + activity.confidence)
+                    Log.e("ActivityRecognition", "Walking: " + activity.confidence)
                     if (activity.confidence >= 75) {
                         val builder = NotificationCompat.Builder(this)
                         builder.setContentText("Are you walking?")
@@ -55,7 +55,7 @@ class ActivityRecognizedService : IntentService {
                     }
                 }
                 DetectedActivity.UNKNOWN -> {
-                    Log.e("ActivityRecogition", "Unknown: " + activity.confidence)
+                    Log.e("ActivityRecognition", "Unknown: " + activity.confidence)
                 }
             }
         }

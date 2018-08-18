@@ -14,6 +14,7 @@ import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import java.util.*
 import android.system.Os.shutdown
+import com.google.android.gms.location.ActivityRecognitionClient
 
 
 class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks,
@@ -21,6 +22,22 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks,
 
     var mTTS: TextToSpeech? = null
     private val ACT_CHECK_TTS_DATA = 1000
+    private lateinit var activityRecognitionClient: ActivityRecognitionClient
+    var mApiClient: GoogleApiClient? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        mApiClient = GoogleApiClient.Builder(this)
+                .addApi(ActivityRecognition.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build()
+
+        (mApiClient as GoogleApiClient).connect()
+        activityRecognitionClient = ActivityRecognitionClient(this)
+    }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
@@ -41,30 +58,16 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks,
 
     private fun saySomething(text: String, qmode: Int) {
         if (qmode == 1)
-            mTTS?.speak(text, TextToSpeech.QUEUE_ADD, null)
+            mTTS?.speak(text,TextToSpeech.QUEUE_ADD, null, null)
         else
-            mTTS?.speak(text, TextToSpeech.QUEUE_FLUSH, null)
-    }
-
-    var mApiClient: GoogleApiClient? = null
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        mApiClient = GoogleApiClient.Builder(this)
-                .addApi(ActivityRecognition.API)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build()
-
-        (mApiClient as GoogleApiClient).connect()
+            mTTS?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
     }
 
     override fun onConnected(bundle: Bundle?) {
         val intent = Intent(this, ActivityRecognizedService::class.java)
         val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        ActivityRecognition.ActivityRecognitionApi.requestActivityUpdates(mApiClient, 3000, pendingIntent)
+        val task = activityRecognitionClient.requestActivityUpdates(3000, pendingIntent)
+        task.addOnSuccessListener {  }
     }
 
     override fun onConnectionSuspended(i: Int) {

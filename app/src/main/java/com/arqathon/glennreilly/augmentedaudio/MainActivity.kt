@@ -1,22 +1,86 @@
 package com.arqathon.glennreilly.augmentedaudio
 
-import android.support.v7.app.AppCompatActivity
-import android.os.Bundle
-import com.google.android.gms.common.ConnectionResult
-import android.support.annotation.NonNull
-import android.support.annotation.Nullable
-import com.google.android.gms.common.api.GoogleApiClient
-import com.google.android.gms.location.ActivityRecognition
+
 import android.app.PendingIntent
-import com.arqathon.glennreilly.augmentedaudio.service.ActivityRecognizedService
+import android.content.Context
 import android.content.Intent
-import android.speech.tts.TextToSpeech
-import android.widget.Toast
-import java.util.*
-import android.system.Os.shutdown
+import android.content.SharedPreferences
+import android.os.Bundle
+import android.preference.PreferenceManager
+import android.support.v7.app.AppCompatActivity
+import android.view.View
+import android.widget.ListView
+import com.arqathon.glennreilly.augmentedaudio.service.ActivityRecognitionService
 import com.google.android.gms.location.ActivityRecognitionClient
 
 
+class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
+    private var mContext: Context? = null
+    private var mActivityRecognitionClient: ActivityRecognitionClient? = null
+    private var mAdapter: ActivitiesAdapter? = null
+    private val activityDetectionPendingIntent: PendingIntent
+        get() {
+            val intent = Intent(this, ActivityRecognitionService::class.java)
+            return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
+
+        }
+
+    public override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        mContext = this
+
+        val detectedActivitiesListView = findViewById<View>(R.id.activities_listview) as ListView
+
+        val detectedActivities = ActivityRecognitionService.detectedActivitiesFromJson(
+                PreferenceManager.getDefaultSharedPreferences(this).getString(
+                        DETECTED_ACTIVITY, ""))
+
+        mAdapter = ActivitiesAdapter(this, detectedActivities)
+        detectedActivitiesListView.adapter = mAdapter
+        mActivityRecognitionClient = ActivityRecognitionClient(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        PreferenceManager.getDefaultSharedPreferences(this)
+                .registerOnSharedPreferenceChangeListener(this)
+        updateDetectedActivitiesList()
+    }
+
+    override fun onPause() {
+        PreferenceManager.getDefaultSharedPreferences(this)
+                .unregisterOnSharedPreferenceChangeListener(this)
+        super.onPause()
+    }
+
+    fun requestUpdatesHandler(view: View) {
+        val task = mActivityRecognitionClient!!.requestActivityUpdates(
+                3000, activityDetectionPendingIntent)
+        task.addOnSuccessListener { updateDetectedActivitiesList() }
+    }
+
+    protected fun updateDetectedActivitiesList() {
+        val detectedActivities = ActivityRecognitionService.detectedActivitiesFromJson(
+                PreferenceManager.getDefaultSharedPreferences(mContext)
+                        .getString(DETECTED_ACTIVITY, ""))
+
+        mAdapter!!.updateActivities(detectedActivities)
+    }
+
+    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences, s: String) {
+        if (s == DETECTED_ACTIVITY) {
+            updateDetectedActivitiesList()
+        }
+    }
+
+    companion object {
+        val DETECTED_ACTIVITY = ".DETECTED_ACTIVITY"
+    }
+}
+
+/*
 class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener, TextToSpeech.OnInitListener {
 
@@ -58,7 +122,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks,
 
     private fun saySomething(text: String, qmode: Int) {
         if (qmode == 1)
-            mTTS?.speak(text,TextToSpeech.QUEUE_ADD, null, null)
+            mTTS?.speak(text, TextToSpeech.QUEUE_ADD, null, null)
         else
             mTTS?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
     }
@@ -67,7 +131,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks,
         val intent = Intent(this, ActivityRecognizedService::class.java)
         val pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
         val task = activityRecognitionClient.requestActivityUpdates(3000, pendingIntent)
-        task.addOnSuccessListener {  }
+        //task.addOnSuccessListener { }
     }
 
     override fun onConnectionSuspended(i: Int) {
@@ -78,7 +142,7 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks,
 
     }
 
-    override fun onActivityResult(requestCode:Int, resultCode:Int, data:Intent) {
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == ACT_CHECK_TTS_DATA) {
             if (resultCode == TextToSpeech.Engine.CHECK_VOICE_DATA_PASS) {
                 // Data exists, so we instantiate the TTS engine
@@ -103,3 +167,4 @@ class MainActivity : AppCompatActivity(), GoogleApiClient.ConnectionCallbacks,
         super.onDestroy()
     }
 }
+*/

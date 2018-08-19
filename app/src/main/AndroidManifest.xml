@@ -19,7 +19,9 @@
             </intent-filter>
         </activity>
 
-        <service android:name=".service.ActivityRecognizedService" />
+        <service
+            android:name=".service.ActivityRecognitionService"
+            android:exported="false" />
 
     </application>
 

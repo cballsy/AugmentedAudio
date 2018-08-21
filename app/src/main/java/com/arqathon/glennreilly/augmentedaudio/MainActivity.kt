@@ -12,10 +12,13 @@ import android.view.View
 import android.widget.ListView
 import com.arqathon.glennreilly.augmentedaudio.service.ActivityRecognitionService
 import com.google.android.gms.location.ActivityRecognitionClient
+import android.media.AudioAttributes
+import android.media.SoundPool
+import android.media.AudioManager
 
 
 class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
-    private var mContext: Context? = null
+    //private var mContext: Context? = null
     private var mActivityRecognitionClient: ActivityRecognitionClient? = null
     private var mAdapter: ActivitiesAdapter? = null
     private val activityDetectionPendingIntent: PendingIntent
@@ -25,48 +28,97 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
         }
 
+    private lateinit var soundPool: SoundPool
+
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        mContext = this
+        configureSound()
 
         val detectedActivitiesListView = findViewById<View>(R.id.activities_listview) as ListView
 
         val detectedActivities = ActivityRecognitionService.detectedActivitiesFromJson(
-                PreferenceManager.getDefaultSharedPreferences(this).getString(
-                        DETECTED_ACTIVITY, ""))
+            PreferenceManager.getDefaultSharedPreferences(this).getString(
+                DETECTED_ACTIVITY, ""
+            )
+        )
 
         mAdapter = ActivitiesAdapter(this, detectedActivities)
         detectedActivitiesListView.adapter = mAdapter
         mActivityRecognitionClient = ActivityRecognitionClient(this)
     }
 
+    private var soundLoaded: Boolean = false
+
+
+    private var soundId: Int? = null
+
+    fun configureSound() {
+        val attributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+
+        soundPool = SoundPool.Builder()
+            .setAudioAttributes(attributes)
+            .build()
+
+        soundId = soundPool.load(this, R.raw.beep_a_major, 1)
+
+        soundPool.setOnLoadCompleteListener(object : SoundPool.OnLoadCompleteListener {
+            override fun onLoadComplete(
+                soundPool: SoundPool, sampleId: Int,
+                status: Int
+            ) {
+                soundLoaded = true
+            }
+        })
+    }
+
     override fun onResume() {
         super.onResume()
         PreferenceManager.getDefaultSharedPreferences(this)
-                .registerOnSharedPreferenceChangeListener(this)
+            .registerOnSharedPreferenceChangeListener(this)
         updateDetectedActivitiesList()
     }
 
     override fun onPause() {
         PreferenceManager.getDefaultSharedPreferences(this)
-                .unregisterOnSharedPreferenceChangeListener(this)
+            .unregisterOnSharedPreferenceChangeListener(this)
         super.onPause()
     }
 
     fun requestUpdatesHandler(view: View) {
         val task = mActivityRecognitionClient!!.requestActivityUpdates(
-                3000, activityDetectionPendingIntent)
+            3000, activityDetectionPendingIntent
+        )
         task.addOnSuccessListener { updateDetectedActivitiesList() }
     }
 
     protected fun updateDetectedActivitiesList() {
+
+        play()
         val detectedActivities = ActivityRecognitionService.detectedActivitiesFromJson(
-                PreferenceManager.getDefaultSharedPreferences(mContext)
-                        .getString(DETECTED_ACTIVITY, ""))
+            PreferenceManager.getDefaultSharedPreferences(this)
+                .getString(DETECTED_ACTIVITY, "")
+        )
 
         mAdapter!!.updateActivities(detectedActivities)
+    }
+
+    fun play() {
+
+        val audioManager = this.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        val actVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING).toFloat()
+        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING).toFloat()
+        val volume = actVolume / maxVolume
+
+
+        if (soundLoaded) {
+            soundId?.let{soundPool.play(soundId as Int, volume, volume, 1, 0, 0.69f)}
+        }
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences, s: String) {

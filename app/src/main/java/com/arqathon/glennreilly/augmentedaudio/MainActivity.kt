@@ -15,12 +15,19 @@ import com.google.android.gms.location.ActivityRecognitionClient
 import android.media.AudioAttributes
 import android.media.SoundPool
 import android.media.AudioManager
+import com.arqathon.glennreilly.augmentedaudio.audio.AudioConfigger
+import com.arqathon.glennreilly.augmentedaudio.data.ActivityNotificationEvent
+import com.arqathon.glennreilly.augmentedaudio.data.SoundSet
+import com.google.android.gms.location.DetectedActivity
 
 
 class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
-    //private var mContext: Context? = null
     private var mActivityRecognitionClient: ActivityRecognitionClient? = null
     private var mAdapter: ActivitiesAdapter? = null
+    private var soundLoaded: Boolean = false
+    private var beepInAMajor: Int? = null
+    private val soundMap = AudioConfigger.soundMap
+
     private val activityDetectionPendingIntent: PendingIntent
         get() {
             val intent = Intent(this, ActivityRecognitionService::class.java)
@@ -33,8 +40,6 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        configureSound()
 
         val detectedActivitiesListView = findViewById<View>(R.id.activities_listview) as ListView
 
@@ -49,11 +54,6 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         mActivityRecognitionClient = ActivityRecognitionClient(this)
     }
 
-    private var soundLoaded: Boolean = false
-
-
-    private var soundId: Int? = null
-
     fun configureSound() {
         val attributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -64,7 +64,6 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             .setAudioAttributes(attributes)
             .build()
 
-        soundId = soundPool.load(this, R.raw.beep_a_major, 1)
 
         soundPool.setOnLoadCompleteListener(object : SoundPool.OnLoadCompleteListener {
             override fun onLoadComplete(
@@ -74,10 +73,13 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
                 soundLoaded = true
             }
         })
+
+        beepInAMajor = soundPool.load(this, R.raw.beep_a_major, 1)
     }
 
     override fun onResume() {
         super.onResume()
+        configureSound()
         PreferenceManager.getDefaultSharedPreferences(this)
             .registerOnSharedPreferenceChangeListener(this)
         updateDetectedActivitiesList()
@@ -98,7 +100,20 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
     protected fun updateDetectedActivitiesList() {
 
-        play()
+        val mostProbableActivity =
+            ActivityRecognitionService.getMostProbableActivityFromJson(
+                PreferenceManager.getDefaultSharedPreferences(this)
+                    .getString(MOST_PROBABLE_ACTIVITY, "")
+            )
+
+        val volume = getCurrentVolume() //TODO need to factor in how our volume relates to system volume. Percentage?
+
+        mostProbableActivity?.let {
+            val activityNotificationEvent = ActivityNotificationEvent(SoundSet(beepInAMajor!!, 3, volume, volume), it)
+            play(activityNotificationEvent)
+            //play(it)
+        }
+
         val detectedActivities = ActivityRecognitionService.detectedActivitiesFromJson(
             PreferenceManager.getDefaultSharedPreferences(this)
                 .getString(DETECTED_ACTIVITY, "")
@@ -107,18 +122,40 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         mAdapter!!.updateActivities(detectedActivities)
     }
 
-    fun play() {
-
-        val audioManager = this.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-        val actVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING).toFloat()
-        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING).toFloat()
-        val volume = actVolume / maxVolume
-
+    fun play(activityNotificationEvent: ActivityNotificationEvent){
 
         if (soundLoaded) {
-            soundId?.let{soundPool.play(soundId as Int, volume, volume, 1, 0, 0.69f)}
+            //TODO instead of directly playing the sound, perhaps we should insert it into a queue
+            //TODO How long does a sample loop for? until something else happens? (could get annoying)
+
+            beepInAMajor?.let{soundPool.play(
+                activityNotificationEvent.soundSet.soundId,
+                activityNotificationEvent.soundSet.leftVolume,
+                activityNotificationEvent.soundSet.rightVolume,
+                1,
+                activityNotificationEvent.soundSet.loopCount,
+                activityNotificationEvent.detectedActivity.confidence.toFloat()/100
+            )}
         }
+    }
+
+    fun play(detectedActivity: DetectedActivity) {
+        val volume = getCurrentVolume()
+
+        if (soundLoaded) {
+            //beepInAMajor?.let{soundPool.play(beepInAMajor as Int, volume, volume, 1, 0, 0.69f)}
+            beepInAMajor?.let{
+                soundPool.play(beepInAMajor as Int, volume, volume, 1, 0, detectedActivity.confidence.toFloat()/100)
+            }
+        }
+    }
+
+    fun getCurrentVolume(): Float {
+        val audioManager = this.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val actVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
+        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).toFloat()
+        val volume = actVolume / maxVolume //TODO need to factor in how our volume relates to system volume. Percentage?
+        return volume
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences, s: String) {
@@ -129,6 +166,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
     companion object {
         val DETECTED_ACTIVITY = ".DETECTED_ACTIVITY"
+        val MOST_PROBABLE_ACTIVITY = ".MOST_PROBABLE_ACTIVITY"
     }
 }
 

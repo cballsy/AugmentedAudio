@@ -23,14 +23,14 @@ class ActivityRecognitionService : IntentService {
 
     companion object {
         val POSSIBLE_ACTIVITIES = intArrayOf(
-                DetectedActivity.STILL,
-                DetectedActivity.ON_FOOT,
-                DetectedActivity.WALKING,
-                DetectedActivity.RUNNING,
-                DetectedActivity.IN_VEHICLE,
-                DetectedActivity.ON_BICYCLE,
-                DetectedActivity.TILTING,
-                DetectedActivity.UNKNOWN
+            DetectedActivity.STILL,
+            DetectedActivity.ON_FOOT,
+            DetectedActivity.WALKING,
+            DetectedActivity.RUNNING,
+            DetectedActivity.IN_VEHICLE,
+            DetectedActivity.ON_BICYCLE,
+            DetectedActivity.TILTING,
+            DetectedActivity.UNKNOWN
         )
 
         fun getActivityString(context: Context, detectedActivityType: Int): String {
@@ -47,10 +47,12 @@ class ActivityRecognitionService : IntentService {
             }
         }
 
-        fun detectedActivitiesFromJson(jsonArray: String): ArrayList<DetectedActivity> {
-            val listType = object : TypeToken<ArrayList<DetectedActivity>>() {
+        fun getMostProbableActivityFromJson(jsonActivity: String): DetectedActivity? {
+            return Gson().fromJson(jsonActivity, DetectedActivity::class.java)
+        }
 
-            }.type
+        fun detectedActivitiesFromJson(jsonArray: String): ArrayList<DetectedActivity> {
+            val listType = object : TypeToken<ArrayList<DetectedActivity>>() {}.type
             var detectedActivities: ArrayList<DetectedActivity>? = Gson().fromJson(jsonArray, listType)
             if (detectedActivities == null) {
                 detectedActivities = ArrayList()
@@ -70,10 +72,17 @@ class ActivityRecognitionService : IntentService {
 
             val detectedActivities = result.probableActivities as ArrayList
             PreferenceManager.getDefaultSharedPreferences(this)
-                    .edit()
-                    .putString(MainActivity.DETECTED_ACTIVITY,
-                            detectedActivitiesToJson(detectedActivities))
-                    .apply()
+                .edit()
+                .putString(
+                    MainActivity.DETECTED_ACTIVITY,
+                    detectedActivitiesToJson(detectedActivities)
+                )
+
+                .putString(
+                    MainActivity.MOST_PROBABLE_ACTIVITY,
+                    Gson().toJson(mostProbableActivity)
+                )
+                .apply()
         }
     }
 

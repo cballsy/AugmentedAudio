@@ -64,15 +64,4 @@ object SoundManager {
         }
     }
 
-/*    fun play(detectedActivity: DetectedActivity) {
-        val volume = getCurrentVolume()
-
-        if (soundLoaded) {
-            //beepInAMajor?.let{soundPool.play(beepInAMajor as Int, volume, volume, 1, 0, 0.69f)}
-            beepInAMajor?.let{
-                soundPool.play(beepInAMajor as Int, volume, volume, 1, 0, detectedActivity.confidence.toFloat()/100)
-            }
-        }
-    }*/
-
 }

@@ -5,28 +5,22 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.media.AudioManager
 import android.os.Bundle
 import android.preference.PreferenceManager
 import android.support.v7.app.AppCompatActivity
 import android.view.View
 import android.widget.ListView
+import com.arqathon.glennreilly.augmentedaudio.audio.SoundManager
 import com.arqathon.glennreilly.augmentedaudio.service.ActivityRecognitionService
 import com.google.android.gms.location.ActivityRecognitionClient
-import android.media.AudioAttributes
-import android.media.SoundPool
-import android.media.AudioManager
-import com.arqathon.glennreilly.augmentedaudio.audio.AudioConfigger
 import com.arqathon.glennreilly.augmentedaudio.data.ActivityNotificationEvent
 import com.arqathon.glennreilly.augmentedaudio.data.SoundSet
-import com.google.android.gms.location.DetectedActivity
 
 
 class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
     private var mActivityRecognitionClient: ActivityRecognitionClient? = null
     private var mAdapter: ActivitiesAdapter? = null
-    private var soundLoaded: Boolean = false
-    private var beepInAMajor: Int? = null
-    private val soundMap = AudioConfigger.soundMap
 
     private val activityDetectionPendingIntent: PendingIntent
         get() {
@@ -34,8 +28,6 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
 
         }
-
-    private lateinit var soundPool: SoundPool
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,32 +46,9 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         mActivityRecognitionClient = ActivityRecognitionClient(this)
     }
 
-    fun configureSound() {
-        val attributes = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_MEDIA)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build()
-
-        soundPool = SoundPool.Builder()
-            .setAudioAttributes(attributes)
-            .build()
-
-
-        soundPool.setOnLoadCompleteListener(object : SoundPool.OnLoadCompleteListener {
-            override fun onLoadComplete(
-                soundPool: SoundPool, sampleId: Int,
-                status: Int
-            ) {
-                soundLoaded = true
-            }
-        })
-
-        beepInAMajor = soundPool.load(this, R.raw.beep_a_major, 1)
-    }
-
     override fun onResume() {
         super.onResume()
-        configureSound()
+        SoundManager.configureSound(this)
         PreferenceManager.getDefaultSharedPreferences(this)
             .registerOnSharedPreferenceChangeListener(this)
         updateDetectedActivitiesList()
@@ -98,7 +67,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         task.addOnSuccessListener { updateDetectedActivitiesList() }
     }
 
-    protected fun updateDetectedActivitiesList() {
+    private fun updateDetectedActivitiesList() {
 
         val mostProbableActivity =
             ActivityRecognitionService.getMostProbableActivityFromJson(
@@ -109,8 +78,8 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         val volume = getCurrentVolume() //TODO need to factor in how our volume relates to system volume. Percentage?
 
         mostProbableActivity?.let {
-            val activityNotificationEvent = ActivityNotificationEvent(SoundSet(beepInAMajor!!, 3, volume, volume), it)
-            play(activityNotificationEvent)
+            val activityNotificationEvent = ActivityNotificationEvent(SoundSet(SoundManager.beepInAMajor, 3, volume, volume), it)
+            SoundManager.play(activityNotificationEvent)
             //play(it)
         }
 
@@ -122,33 +91,6 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         mAdapter!!.updateActivities(detectedActivities)
     }
 
-    fun play(activityNotificationEvent: ActivityNotificationEvent){
-
-        if (soundLoaded) {
-            //TODO instead of directly playing the sound, perhaps we should insert it into a queue
-            //TODO How long does a sample loop for? until something else happens? (could get annoying)
-
-            beepInAMajor?.let{soundPool.play(
-                activityNotificationEvent.soundSet.soundId,
-                activityNotificationEvent.soundSet.leftVolume,
-                activityNotificationEvent.soundSet.rightVolume,
-                1,
-                activityNotificationEvent.soundSet.loopCount,
-                activityNotificationEvent.detectedActivity.confidence.toFloat()/100
-            )}
-        }
-    }
-
-    fun play(detectedActivity: DetectedActivity) {
-        val volume = getCurrentVolume()
-
-        if (soundLoaded) {
-            //beepInAMajor?.let{soundPool.play(beepInAMajor as Int, volume, volume, 1, 0, 0.69f)}
-            beepInAMajor?.let{
-                soundPool.play(beepInAMajor as Int, volume, volume, 1, 0, detectedActivity.confidence.toFloat()/100)
-            }
-        }
-    }
 
     fun getCurrentVolume(): Float {
         val audioManager = this.getSystemService(Context.AUDIO_SERVICE) as AudioManager
